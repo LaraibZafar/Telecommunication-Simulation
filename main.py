@@ -10,10 +10,16 @@ class Line:
     def __init__(self, name, createdAt, timeServed):
         self.name = name
         self.createdAt = createdAt
-        self.timeServed = timeServed
+        self.timeServed = 0
     
-    def updateTimeServed(latestServiceDuration):
+    def updateTimeServed(self,latestServiceDuration):
         self.timeServed += latestServiceDuration
+    
+    def __str__(self):
+        return self.name+" "+ str(self.timeServed);
+
+    def __lt__(self, other):
+        return self.name < other.name
 
 def lineIncrement(lineName):
     return lineName + "I"
@@ -40,7 +46,6 @@ def telecomSimulation(durationInHours, ProbabilityCallOrigin_A):
     simulationData = pd.DataFrame(columns=['interCallTime', 'arrivalTime', 'callDuration', 'departureTime', "callOrigin", "lineTitle"])
     
     while(maxDepartureTime <= durationInSeconds):
-        
         callOriginProbability = random.uniform(0, 1)
         callOrigin = 'A' if(callOriginProbability <= ProbabilityCallOrigin_A) else 'B'
         simulationData.at[i, 'callOrigin'] = callOrigin
@@ -59,26 +64,39 @@ def telecomSimulation(durationInHours, ProbabilityCallOrigin_A):
 
         simulationData.at[i, 'departureTime'] = simulationData.loc[i]['arrivalTime'] + simulationData.loc[i]['callDuration']
         if(minimumExitQueue.empty()):
-            createNewLine = True
+            createNewLine = True  
         else:
+            #print(minimumExitQueue.queue[0][0])
             createNewLine = True if(minimumExitQueue.queue[0][0] > simulationData.at[i, 'arrivalTime']) else False
         
         if(createNewLine):
+            #countBlockedCalls++
             lineName = "Line" + str(lineCount)
             newLine = Line(lineName,simulationData.at[i, 'arrivalTime'], simulationData.loc[i]['callDuration'])
+            newLine.updateTimeServed(simulationData.loc[i]['callDuration'])
             simulationData.at[i,'lineTitle'] = lineName
+            minimumExitQueue.put((simulationData.loc[i]['departureTime'],newLine))
             lineCount += 1
         else:
-            lineName = minimumExitQueue.get()
-            simulationData.at[i,'lineTitle'] = lineName[1]
-
-        minimumExitQueue.put((simulationData.at[i, 'departureTime'],lineName))
+            peak = minimumExitQueue.queue[0]
+            #print(peak[0])
+            #print(peak[1])
+            firstToExit = minimumExitQueue.get()
+            #print(firstToExit)
+            line = firstToExit[1]
+            #print(line)
+            simulationData.at[i,'lineTitle'] = line.name
+            line.updateTimeServed(simulationData.loc[i]['callDuration'])
+            minimumExitQueue.put((simulationData.loc[i]['departureTime'],line))
+        
         maxDepartureTime = max(maxDepartureTime,simulationData.at[i, 'departureTime'])
         i += 1
     print(lineCount)
-    simulationData.plot.line(y="callDuration");
-    simulationData.plot.line(y="departureTime");
-    plot.show()
+    print(simulationData)
+
+    #simulationData.plot.line(y="callDuration");
+    #simulationData.plot.line(y="departureTime");
+    #plot.show()
     
 telecomSimulation(12,0.5)
        
