@@ -33,6 +33,19 @@ def initalizeQueue(minimumExitQueue,lineData,numberOfLines):
         minimumExitQueue.put((0,newLine))
         lineData.at[lineCount,'Line'] =newLine
 
+def calculateNumberOfLinesBusy(numberOfLines,newArrivalTime,queue):
+    numberOfFreeLines = 1 #Number of Lines = 1 + Line Number
+    for i in range(0,queue.qsize()):
+        if(newArrivalTime > queue.queue[i][0]):
+            numberOfFreeLines+=1
+    return numberOfLines-numberOfFreeLines
+
+def calculateTotalTimeServed(lineData):
+    totalTimeServed = 0
+    for i in range(0,lineData.shape[0]):
+        totalTimeServed += lineData.loc[i]['Line'].timeServed
+    
+    return totalTimeServed;
 
 def telecomSimulation(numberOfLines,durationInHours, ProbabilityCallOrigin_A):
     durationInSeconds = durationInHours * 3600
@@ -52,14 +65,16 @@ def telecomSimulation(numberOfLines,durationInHours, ProbabilityCallOrigin_A):
     maxDepartureTime = 0
     callOrigin = ''
     blockedCalls=0
+    totalCalls = 0
     minimumExitQueue = PriorityQueue()
 
-    simulationData = pd.DataFrame(columns=['interCallTime', 'arrivalTime', 'callDuration', 'departureTime', "callOrigin", "lineTitle"])
+    simulationData = pd.DataFrame(columns=['interCallTime', 'arrivalTime', 'callDuration', 'departureTime', "callOrigin", "lineTitle",'numberOfLinesBusy'])
     lineData = pd.DataFrame(columns=['Line','Efficiency'])
 
     initalizeQueue(minimumExitQueue,lineData,numberOfLines)
     
     while(maxDepartureTime <= durationInSeconds):
+        totalCalls+=1
         callOriginProbability = random.uniform(0, 1)
         callOrigin = 'A' if(callOriginProbability <= ProbabilityCallOrigin_A) else 'B'
         simulationData.at[i, 'callOrigin'] = callOrigin
@@ -77,28 +92,18 @@ def telecomSimulation(numberOfLines,durationInHours, ProbabilityCallOrigin_A):
             simulationData.at[i, 'arrivalTime'] = simulationData.loc[i]['interCallTime']
 
         simulationData.at[i, 'departureTime'] = simulationData.loc[i]['arrivalTime'] + simulationData.loc[i]['callDuration']
-        #if(minimumExitQueue.empty()):
-            #createNewLine = True  
-        #else:
         createNewLine = True if(minimumExitQueue.queue[0][0] > simulationData.at[i, 'arrivalTime']) else False
         
         if(createNewLine):
-            # if(lineCount <= numberOfLines):
-            #     lineName = "Line" + str(lineCount)
-            #     newLine = Line(lineName,simulationData.at[i, 'arrivalTime'], simulationData.loc[i]['callDuration'])
-            #     newLine.updateTimeServed(simulationData.loc[i]['callDuration'])
-            #     simulationData.at[i,'lineTitle'] = lineName
-            #     minimumExitQueue.put((simulationData.loc[i]['departureTime'],newLine))
-            #     lineData.at[lineCount-1,'Line'] =newLine
-            #     lineCount += 1
-            # else:
             blockedCalls +=1
+            simulationData.at[i,'numberOfLinesBusy'] =numberOfLines
         else:
             firstToExit = minimumExitQueue.get()
             line = firstToExit[1]
             simulationData.at[i,'lineTitle'] = line.name
             line.updateTimeServed(simulationData.loc[i]['callDuration'])
             minimumExitQueue.put((simulationData.loc[i]['departureTime'],line))
+            simulationData.at[i,'numberOfLinesBusy'] = calculateNumberOfLinesBusy(numberOfLines,simulationData.loc[i]['arrivalTime'],minimumExitQueue)
         
         maxDepartureTime = max(maxDepartureTime,simulationData.at[i, 'departureTime'])
         i += 1
@@ -107,17 +112,23 @@ def telecomSimulation(numberOfLines,durationInHours, ProbabilityCallOrigin_A):
         lineData.at[i,'Efficiency'] = lineData.loc[i]['Line'].timeServed/(durationInHours*3600)
     
     lineData.plot.bar(y="Efficiency")
-    plot.show()
     print(simulationData)
     print(lineData)
-    print(blockedCalls)
 
+    proportionBusyLines=calculateTotalTimeServed(lineData)/(durationInHours*3600)
 
-    #simulationData.plot.line(y="callDuration");
-    #simulationData.plot.line(y="departureTime");
-    #plot.show()
+    print("\nTotal Average Number of Lines Busy",simulationData['numberOfLinesBusy'].sum()/totalCalls)
+    print("Proportions of Lines that are busy",proportionBusyLines)
+    print("\nNumber of Total Calls : ",totalCalls)
+    print("Number of Blocked Calls : ",blockedCalls)
+    print("\nNumber Of Lines : ", numberOfLines)
+    print("Percentage of Blocked Calls : ",blockedCalls/totalCalls)
     
-telecomSimulation(10,12,0.5)
+    plot.show()
+
+
+    
+telecomSimulation(25,12,0.5)
     
 
 
